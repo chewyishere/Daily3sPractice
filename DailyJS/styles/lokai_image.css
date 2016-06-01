@@ -1,0 +1,80 @@
+body {
+	background: #fff;
+	color: #333;
+	font-size: 1em;
+	font-family: 'Questrial', 'Avenir', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    margin: 0;
+    overflow: hidden;
+}
+
+button:hover, button:focus {
+	color: rgb(255, 205, 130);
+}
+
+#open, #play, #pause, #close{
+	font-size: 2em;
+	float: left;
+}
+
+
+button {
+	background-color: white; /* Green */
+    border: none;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 12px;
+	cursor: pointer; 
+    text-transform: uppercase;
+    font-weight: bold;
+    color: rgb(160, 148, 147);
+}
+
+#container{
+    position: relative;
+    width: 100%;
+    margin:0%;
+    height: 100%;  
+    padding: 0px; 
+}
+
+.valiantContainer{
+	width: 480px;
+    height: 380px;
+}
+
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+#video {
+    position: absolute;
+    left: -9999em;
+}
+#example {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+
+
+/*.hide  {
+	visibility: hidden;
+    transition: visibility 0s, opacity 0.5s ease-out;
+    opacity: 0;
+    height: 0; 
+}
+.active {
+	visibility: visible;
+    opacity: 1;
+    height: auto;
+*/
+}

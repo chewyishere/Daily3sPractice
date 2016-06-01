@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+	<title>LOKAI 360 </title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="styles/lokai.css" />
+	</head>
+	
+	<body>
+         <div class="info">
+		    <a><span id="open">open</span></a>
+		    <a><span id="close">close</span></a>
+		</div>
+
+		<div id="canvas">
+		</div>
+
+    <script src="build/three.min.js"></script>
+	<script src="js/controls/OrbitControls.js"></script>
+	<script src="js/DeviceOrientationControls.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+	<script>
+		$(document).ready(function(){
+
+		    $("#open").click(function(){
+		        var div = $("#canvas");
+		        div.animate({height: '80%', opacity: '1'}, "slow");
+		        div.animate({width: '80%', opacity: '1'}, "slow");
+
+		        $("#open").animate({ opacity: '0'}, "slow");
+		        $("#close").animate({ opacity: '1'}, "slow");
+
+		    });
+
+		    $("#close").click(function(){
+		        var div = $("#canvas");
+		        div.animate({height: '0px', opacity: '0'}, "slow");
+		        div.animate({width: '0px', opacity: '0'}, "slow");
+		        $("#close").animate({ opacity: '0'}, "slow");
+		        $("#open").animate({ opacity: '1'}, "slow");
+		    });
+		});
+
+	</script>
+
+    <script>
+
+		var camera, scene, renderer, envGeometry, envMaterial, envMap,
+			element, container, controls,
+			CANVAS_WIDTH = window.innerWidth*0.8,
+			CANVAS_HEIGHT = window.innerHeight*0.8;
+
+		init();
+		animate();
+
+
+		function init() {
+
+			container = document.getElementById( 'canvas' );
+			document.body.appendChild( container );
+
+			scene = new THREE.Scene();
+
+			camera = new THREE.PerspectiveCamera( 50, CANVAS_WIDTH / CANVAS_HEIGHT, 1, 1000 );
+
+			//ENV MAP -- Panoramas Background
+
+			envGeometry = new THREE.SphereGeometry( 500, 60, 40 );
+			envGeometry.scale( - 1, 1, 1 );
+
+			envMaterial = new THREE.MeshBasicMaterial( {
+				map: new THREE.TextureLoader().load( 'textures/nike/2.png' )
+			} );
+
+			envMap = new THREE.Mesh( envGeometry, envMaterial );
+
+	        scene.add( envMap );
+
+			//RENDER SETTINGS
+
+	        renderer = new THREE.WebGLRenderer();
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( CANVAS_WIDTH, CANVAS_HEIGHT );
+			element = renderer.domElement;
+			container.appendChild(element);
+
+			//CONTROL: ORBIT CONTROL ON WEB
+
+			controls = new THREE.OrbitControls(camera, element);
+			controls.minDistance = 10;
+			controls.maxDistance = 100;
+			controls.enableDamping = true;
+			controls.dampingFactor = 0.75;
+			controls.enableZoom = false;
+			controls.enablePan = true;
+
+		    console.log("orbit control");
+
+
+		    //CONTROL: ORBIT CONTROL ON WEB
+
+	        function setOrientationControls(e) {
+
+	        	console.log("orientation control");
+		    	
+		      // Check if device orientation is not available.
+		        if (!e.alpha) {
+		          return;
+		        }
+
+			    controls = new THREE.DeviceOrientationControls(camera, true);
+			    controls.connect();
+			    controls.update();
+			    //controls.enableManualDrag = true;
+
+    		    window.removeEventListener('deviceorientation', setOrientationControls, false);
+		    }
+				 
+		    window.addEventListener('deviceorientation', setOrientationControls, true);
+			//window.addEventListener( 'resize', onWindowResize, false );
+
+		}
+
+
+		// function onWindowResize() {
+
+		// 	camera.aspect = window.innerWidth / window.innerHeight;
+		// 	camera.updateProjectionMatrix();
+
+		// 	renderer.setSize( window.innerWidth, window.innerHeight );
+
+		// }
+
+		function animate() {
+
+				requestAnimationFrame( animate );
+				render();
+				controls.update(); 
+
+			}
+
+		function render() {
+			renderer.render( scene, camera );
+
+	}
+
+
+	</script>
+	</body>
+</html>

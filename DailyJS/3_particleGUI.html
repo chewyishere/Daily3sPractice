@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Nike_test3_Points</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+		</style>
+	</head>
+
+	<body>
+		<div id="info">
+		webGL shoe tests</div>
+
+		<script src="../build/three.min.js"></script>
+		<script src='js/controls/OrbitControls.js'></script>
+		<script src="js/Detector.js"></script>
+		<script src="js/libs/stats.min.js"></script>
+		<script src="js/utils/lodash.core.min.js"></script>
+		<script src="js/libs/dat.gui.min.js"></script>
+
+		<script>
+
+		    var SCREEN_WIDTH = window.innerWidth;
+			var SCREEN_HEIGHT = window.innerHeight;
+
+			var container, stats;
+
+			var camera, scene, renderer, particles, geometry, materials = [], parameters, i, h, color, sprite, size;
+
+			var mouseX = 0, mouseY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var radius = 80;
+			var numOfParticles =600;
+			var angle = 360/numOfParticles; 
+
+			var textureEquirec, cubeTexture;
+			var cubeMesh;
+
+			var deltaArray = [];
+
+			var stage = 0;
+			
+			var raycaster = new THREE.Raycaster();
+			var mouse = new THREE.Vector2();
+
+			var interactableObjects = [];
+			var isSneakerHit = false;
+			var intersects;
+
+
+			init();
+			animate();
+
+			function mergeMeshes (meshes) {
+			  var combined = new THREE.Geometry();
+
+			  for (var i = 0; i < meshes.length; i++) {
+			    meshes[i].updateMatrix();
+			    combined.merge(meshes[i].geometry, meshes[i].matrix);
+			  }
+
+			  return combined;
+			}
+
+			function getRandomInt(min, max) {
+			    return Math.floor(Math.random() * (max - min + 1)) + min;
+			}
+			function mapRange(value, low1, high1, low2, high2) {
+			    return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
+			}
+
+
+		    function loadModels(){
+				var objectLoader = new THREE.ObjectLoader();
+				objectLoader.load("models/json/nike/nikeNoFloor.json", function ( obj ) {
+					object = obj;
+					scene.name = "sneaker";
+					scene.add( object );
+				    interactableObjects.push( object );
+					console.log(object);
+
+				});
+			}
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				// CAMERA
+				camera = new THREE.PerspectiveCamera( 50, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 2000 );
+			
+				camera.position.z = 400;
+				
+				// SCENE
+				scene = new THREE.Scene();
+				scene.fog = new THREE.FogExp2( 0x000000, 0.0008 );
+			
+				// OrbitControl
+				controls = new THREE.OrbitControls( camera );
+				controls.minDistance = 10;
+				controls.maxDistance = 200;
+
+				// TRIANGLE PARTICLE ++++++++++++++++++++++++++++++++++++++++++++++
+
+				// Step1 - Create Instance of Geometry 
+
+				var triangleGeometry = new THREE.Geometry();
+
+				// Step2 - Define shape vertices
+
+				triangleGeometry.vertices.push(new THREE.Vector3( 0.0,  1.0, 0.0)); 
+                triangleGeometry.vertices.push(new THREE.Vector3(-1.0, -1.0, 0.0)); 
+                triangleGeometry.vertices.push(new THREE.Vector3( 1.0, -1.0, 0.0)); 
+
+                // step3 - Define how vertices link together
+
+	            triangleGeometry.faces.push(new THREE.Face3(0, 1, 2)); 
+
+				for ( i = 0; i < numOfParticles; i ++ ) {
+
+					var vertex = new THREE.Vector3();
+			
+					 vertex.x = ( radius * Math.cos(angle * i) + 0 );
+					 vertex.z = ( radius * Math.sin(angle * i) + 0 );
+			 		 vertex.y = Math.sin(angle * i)/3 * 20;
+
+					triangleGeometry.vertices.push( vertex );
+					
+					deltaArray.push( i * 5 );
+
+				}
+	           
+	            // step4 - Set parameters for particle
+
+				parameters = [
+					[ [1, 1, 0.5], 3 ],
+					[ [0.95, 1, 0.5], 2 ],
+					[ [0.90, 1, 0.5], 1.3 ],
+					[ [0.85, 1, 0.5], 0.8 ],
+					[ [0.80, 1, 0.5], 0.5 ]
+				];
+    
+
+				for ( i = 0; i < parameters.length; i ++ ) {
+
+					color = parameters[i][0];
+					size  = parameters[i][1];
+
+					materials[i] = new THREE.PointsMaterial( { size: size } );
+
+					particles = new THREE.Points( triangleGeometry, materials[i] );
+
+				    scene.add( particles );
+
+				}
+
+				console.log(particles);
+
+				
+				/* PARTICLE TEXTURE
+
+				geometry = new THREE.Geometry();
+
+				// PARTICLE TEXTURE LOADER 
+
+			    var textureLoader = new THREE.TextureLoader();
+
+				sprite1 = textureLoader.load( "textures/sprites/snowflake1.png" );
+				sprite2 = textureLoader.load( "textures/sprites/snowflake2.png" );
+				sprite3 = textureLoader.load( "textures/sprites/snowflake3.png" );
+				sprite4 = textureLoader.load( "textures/sprites/snowflake4.png" );
+				sprite5 = textureLoader.load( "textures/sprites/snowflake5.png" );
+
+				// PARTICLE 
+
+				parameters = [
+					[ [1.0, 0.2, 0.5], sprite2, 20 ],
+					[ [0.95, 0.1, 0.5], sprite3, 10 ],
+					[ [0.90, 0.05, 0.5], sprite1, 8 ],
+					[ [0.85, 0, 0.5], sprite5, 4 ],
+					[ [0.80, 0, 0.5], sprite4, 2 ]
+				];
+
+				for ( i = 0; i < parameters.length; i ++ ) {
+
+					color  = parameters[i][0];
+					sprite = parameters[i][1];
+					size   = parameters[i][2];
+
+					materials[i] = new THREE.PointsMaterial( { size: size, map: sprite, blending: THREE.AdditiveBlending, depthTest: false, transparent : true } );
+					materials[i].color.setHSL( color[0], color[1], color[2] );
+
+					particles = new THREE.Points( geometry, materials[i] );
+					scene.add( particles );
+				
+				}
+				*/ 
+
+				// Envoirment Textures++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+				// SkyBox / Cube 
+
+				
+				var r = "textures/cube/Bridge2/";
+				var urls = [ r + "posx.jpg", r + "negx.jpg",
+							 r + "posy.jpg", r + "negy.jpg",
+							 r + "posz.jpg", r + "negz.jpg" ];
+
+		        cubeTexture = new THREE.CubeTextureLoader().load( urls );
+		        var cubeShader = THREE.ShaderLib[ "cube" ];
+		        cubeShader.uniforms[ "tCube" ].value = cubeTexture;
+
+		        var cubeMaterial = new THREE.ShaderMaterial( {
+
+		            fragmentShader:  cubeShader.fragmentShader,
+		            vertexShader:  cubeShader.vertexShader,
+		            uniforms:  cubeShader.uniforms,
+		            side: THREE.BackSide
+
+		        });
+
+				var textureLoader = new THREE.TextureLoader();
+
+				textureEquirec = textureLoader.load( "textures/_nike/1.jpg" );
+				textureEquirec2 = textureLoader.load( "textures/_nike/2.jpg" );
+				textureEquirec3 = textureLoader.load( "textures/_nike/3.jpg" );
+				textureEquirec.magFilter = THREE.LinearFilter;
+				textureEquirec.minFilter = THREE.LinearMipMapLinearFilter;
+
+				var equirectShader = THREE.ShaderLib[ "equirect" ];
+
+				var equirectMaterial = new THREE.ShaderMaterial( {
+					fragmentShader: equirectShader.fragmentShader,
+					vertexShader: equirectShader.vertexShader,
+					uniforms: equirectShader.uniforms,
+					depthWrite: false,
+					side: THREE.BackSide
+				} );
+
+				equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec;
+
+		        cubeMesh = new THREE.Mesh( new THREE.CubeGeometry( 1000, 1000, 1000 ), cubeMaterial );
+
+		        scene.add( cubeMesh );
+
+				// LIGHT
+				var directionalLight = new THREE.DirectionalLight( 0xb8b8b8 );
+				directionalLight.position.set( 1, 1, 1 ).normalize();
+				directionalLight.intensity = 1.0;
+				scene.add( directionalLight );
+
+				// Renderer 
+				renderer = new THREE.WebGLRenderer( {antialias: true} );
+				renderer.autoClear = false;
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setFaceCulling( THREE.CullFaceNone );
+				document.body.appendChild( renderer.domElement );
+
+				//stats
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				container.appendChild( stats.domElement );
+
+				// Gui
+				var params = {
+					Clouds: function () {
+						stage = 0 ;
+						cubeMesh.material = cubeMaterial;
+						cubeMaterial.uniforms[ "tCube" ].value = cubeTexture;
+					},
+
+					StreetArt: function () {
+						stage = 1;
+						cubeMesh.material = equirectMaterial;
+						equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec;
+					},
+
+					Snow: function(){
+						stage = 2;
+						cubeMesh.material = equirectMaterial;
+						equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec2;
+					},
+
+					Central: function(){
+						stage = 3;
+						cubeMesh.material = equirectMaterial;
+						equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec3;
+						
+					}
+	
+				};
+
+				var gui = new dat.GUI();
+				gui.add( params, 'Clouds' );
+				gui.add( params, 'StreetArt' );
+				gui.add( params, 'Snow' );
+				gui.add( params, 'Central' );
+				gui.open();
+
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+				window.addEventListener( 'resize', onWindowResize, false );
+		
+				loadModels();
+
+			}
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function onDocumentMouseMove( event ) {
+
+				mouseX = ( event.clientX - windowHalfX ) / 2;
+				mouseY = ( event.clientY - windowHalfY ) / 2;
+
+				event.preventDefault();
+
+				mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+				mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+
+				raycaster.setFromCamera( mouse, camera );
+
+
+				intersects = raycaster.intersectObjects( interactableObjects, true);
+				
+
+				if ( intersects.length > 0 && intersects[0].object.parent.parent.parent.name == "sneaker") {
+
+						
+
+			    	if(!isSneakerHit) {
+
+			    		console.log("ON");
+			    		isSneakerHit = true;
+			    	}
+
+			    } else {
+			    	if(isSneakerHit) {
+			    		console.log("OFF");
+			    		isSneakerHit = false;
+			    	}
+			    }
+			}	
+
+
+			function onDocumentMouseDown(event){
+
+				event.preventDefault();
+
+			    	if(isSneakerHit) {
+			    		
+						//console.log(intersects[0].object.material);
+
+						intersects[0].object.material.color.setRGB(Math.random(), Math.random(), Math.random());
+						
+			    }
+			   
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				render();
+				update_points();
+				stats.update();
+
+			}
+
+			function render() {
+
+	var time = Date.now() * 0.00005;
+
+				 //camera.position.y += (-mouseY - camera.position.y) * 0.05;
+		         //camera.position.x += (mouseX - camera.position.x) * 0.05;
+
+				 camera.lookAt( scene.position );
+				 //cameraCube.rotation.copy( camera.rotation );
+
+				for ( i = 0; i < scene.children.length; i ++ ) {
+
+
+					var object = scene.children[ i ];
+
+					if ( object instanceof THREE.Points ) {
+
+						object.rotation.y = time * ( i < 4 ? i + 1 : - ( i + 1 ) );
+					
+					}
+
+				}
+
+				for ( i = 0; i < materials.length; i ++ ) {
+
+					color = parameters[i][0];
+
+					h = ( 360 * ( color[0] + time ) % 360 ) / 360;
+					materials[i].color.setHSL( h, color[1], color[2] );
+
+				}
+
+
+				renderer.render( scene, camera );
+				//renderer.render( sceneCube, cameraCube );
+			}
+
+
+
+
+			function update_points(){
+
+				var counter = Date.now() * 0.001;
+
+				var new_poistions=[];
+
+				for ( i = 0; i < numOfParticles; i ++ ) {
+					 var x, y, z;
+
+			 		 switch (stage) {
+			 		 case 0:
+				 		 x =  radius * Math.cos(angle * i  * 0.5 );
+						 z =  radius * Math.sin(angle * i  * 0.5 );
+				 		 y =  Math.cos(angle * i * 5 + counter) * deltaArray[i] * 0.005;
+				 		 break;
+
+			 		 case 1:
+						 x =  -10 * Math.sin(angle * i)/3 ;
+						 z =  radius * Math.sin(angle * i  * 0.5 );
+				 		 y =  Math.sin(angle * i + counter) * deltaArray[i] * 0.003;
+				 		 break;
+
+			 		 case 2:
+	 			 		 x = radius * Math.sin(angle * i  * 0.5 );
+						 z = radius * Math.cos(angle * i  * 0.5 ); 
+				 		 y = radius * Math.sin(angle * i  * 0.05 )/2;
+				 		 break;
+
+ 			 		 case 3:
+
+						x = ( radius * Math.cos(angle * i) + 0 );
+						y = 60 * Math.sin(angle * i + counter)/3 ;
+						z = ( radius * Math.sin(angle * i) + 0 );
+				 		 break;
+
+			 		 default:
+				 		 x =  radius * Math.cos(angle * i  * 0.5 );
+						 z =  radius * Math.sin(angle * i  * 0.5 );
+						 y = Math.cos(angle * i * 5) * deltaArray[i] * 0.005;
+
+			 		}
+
+				    new_poistions.push(new THREE.Vector3(x, y, z));
+
+					}
+
+				particles.geometry.verticesNeedUpdate = true;
+				particles.geometry.vertices =new_poistions;
+		
+			 }	
+
+		</script>
+
+	</body>
+</html>

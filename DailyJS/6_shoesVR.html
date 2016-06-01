@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>nikeVR_Split</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+		</style>
+	</head>
+
+	<body>
+		<div id="info">
+		nikeVR_Split</div>
+
+		<script src="js/three.js"></script>
+		<script src='js/OrbitControls.js'></script>
+		<script src="js/dat.gui.min.js"></script>
+		<script src="js/StereoEffect.js"></script>
+		<script src="js/DeviceOrientationControls.js"></script>
+
+		<script>
+
+
+			var camera, scene, renderer, particles, geometry, materials = [], parameters, i, h, color, sprite, size;
+
+			var element, container;
+			var effect, controls;
+
+			var mouseX = 0, mouseY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var radius = 40;
+			var numOfParticles = 150;
+			var angle = 360/numOfParticles; 
+
+			var textureEquirec, cubeTexture;
+			var cubeMesh, cubeMaterial;
+
+			var equirectShader, equirectMaterial 
+
+			var deltaArray = [];
+			
+			var raycaster;
+
+			var interactableObjects = [];
+			var isSneakerHit = false;
+			var intersects;
+			var hoveringObject;
+
+			var object_shoe1, object_shoe2, object_shoe3;
+			var r;
+			var maxRadius = 40, d = 0;
+			var objX = 0, objZ = 0;
+
+			// loader
+			var segments = 64;
+			var circleStart = 0;
+			var circleEnds =  Math.PI*2;
+	        var circleGeometry, circleMaterial;
+	        var circleRadius = 10;
+			var loader;
+			var loader_y =-5;
+			var loader_speed = 0.08;
+			var loading_finish = false;
+
+			var sceneMode = 1;
+			var stereoMode = false;
+			var particleMode;
+
+			var VRcam;
+			var VRcam_radius = 2;
+
+			var isVR = false;
+
+			var mouse = new THREE.Vector2();
+			var cameraTracker = new THREE.Object3D();
+			var rayDirection = new THREE.Vector2();
+			var rayCenter = new THREE.Vector2(windowHalfX,windowHalfY);
+
+			var worldPos = new THREE.Vector3(); 
+			
+
+			init();
+			animate();
+
+			var time = Date.now() * 0.00005;
+
+	        function createMesh(geom) {
+	            // assign two materials
+	            var meshMaterial = new THREE.MeshNormalMaterial({transparent: true, opacity:0.5});
+	            meshMaterial.side = THREE.DoubleSide;
+	            var wireFrameMat = new THREE.MeshBasicMaterial({color: 0xffff00, transparent: true, opacity:0});
+	            wireFrameMat.wireframe = true;
+	            // create a multimaterial
+	            var mesh = THREE.SceneUtils.createMultiMaterialObject(geom, [meshMaterial, wireFrameMat]);
+	            return mesh;
+	        }
+
+			function getRandomInt(min, max) {
+			    return Math.floor(Math.random() * (max - min + 1)) + min;
+			}
+
+			function update_loader(){
+
+				if(hoveringObject != null) {
+					 
+					 this.thetaLength += Math.PI * loader_speed;
+					 if(this.thetaLength >= Math.PI * 2)
+					 {
+					 	this.thetaLength = Math.PI * 2;
+					 	loading_finish = true;
+					 	changeScene();
+					 }
+
+			 	} else {
+
+			 		 this.thetaLength = 0;
+			 		
+			 	}
+			 	
+
+			 	this.redraw = function () {
+
+	                cameraTracker.remove(loader);
+	                loader = createMesh(new THREE.CircleGeometry(circleRadius, segments, circleStart, this.thetaLength));
+	
+
+	                loader.position.set(0,0,-60);
+				    cameraTracker.add(loader);
+
+	            };
+
+	            this.redraw();
+
+			}
+	
+		    function loadModels(){
+		    	var x,y,z;
+		    	r = 110;
+		    	
+				var objectLoader = new THREE.ObjectLoader();
+				var objectLoader2 = new THREE.ObjectLoader();
+				var objectLoader3 = new THREE.ObjectLoader();
+				scene.name = "sneaker";
+
+				objectLoader.load("models/json/nike/nikeNoFloor.json", function ( obj1 ) {
+					object_shoe1 = obj1;;
+					object_shoe1.name = 'sneaker1';
+					object_shoe1.position.x = r * Math.cos(-30);
+					object_shoe1.position.z = r * Math.sin(-30);
+					object_shoe1.position.y = -5;
+					// object_shoe1.position.x = 0;
+					// object_shoe1.position.z = 50;
+					scene.add( object_shoe1 );
+				    interactableObjects.push( object_shoe1 );
+
+				});
+
+				objectLoader2.load("models/json/nike/nikeNoFloor.json", function ( obj2 ) {
+					object_shoe2 = obj2;
+					object_shoe2.name = 'sneaker2';
+					object_shoe2.position.x = r * Math.cos(30);
+					object_shoe2.position.z = r * Math.sin(30);
+					object_shoe2.position.y = -5;
+		
+					scene.add( object_shoe2 );
+					// object_shoe2.rotation.y = Math.PI;
+				    interactableObjects.push( object_shoe2 );
+
+
+				 });
+				objectLoader3.load("models/json/nike/nikeNoFloor.json", function ( obj3 ) {
+					object_shoe3 = obj3;
+					object_shoe3.name = 'sneaker3';
+					object_shoe3.position.x = r * Math.cos(0);
+					object_shoe3.position.z = r * Math.sin(0);
+					object_shoe3.position.y = -5;
+			
+					scene.add( object_shoe3 );
+				    interactableObjects.push( object_shoe3 );
+
+				});
+			}
+
+
+			function changeScene(){
+
+				switch (sceneMode) {
+			 		case 1:
+				 		console.log('sceneMode1');
+		
+ 						cubeMesh.material = cubeMaterial;
+					    cubeMaterial.uniforms[ "tCube" ].value = cubeTexture;
+				 		break;
+
+			 		case 2:
+				 		console.log('sceneMode2');
+
+						cubeMesh.material = equirectMaterial;
+						equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec;
+				 		break;
+
+			 		case 3:
+				 		console.log('sceneMode3');
+	 		
+	 			 		cubeMesh.material = equirectMaterial;
+						equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec2;
+				 		break;
+
+			 		case 4:
+				 		console.log('sceneMode4');
+	 			
+	 			 		cubeMesh.material = equirectMaterial;
+						equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec3;
+				 		break;
+
+			 		default:
+				 		console.log('defaultScene');
+				 	
+				 		cubeMesh.material = equirectMaterial;
+						equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec;
+					}
+				}
+
+
+			function init() {
+
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+
+				// SCENE
+
+				scene = new THREE.Scene();
+				scene.fog = new THREE.FogExp2( 0x000000, 0.0008 );
+
+
+				// CAMERA
+				camera = new THREE.PerspectiveCamera( 50,window.innerWidth / window.innerHeight, 1, 1000 );
+			
+				camera.position.z = 0;
+
+				// Camera - Object3D
+				
+		        var VRGeometry = new THREE.CircleGeometry( VRcam_radius, segments, circleStart, circleEnds);
+				var VRMaterial = new THREE.MeshBasicMaterial( { color: 0x3EA0FF } );
+
+				VRcam = new THREE.Mesh(VRGeometry, VRMaterial );
+
+			    loadModels();
+   
+				    
+				VRcam.lookAt (camera);
+
+				VRcam.position.set(0,0,-50);
+
+				cameraTracker.position.set(0,0,0);
+				
+				//camera.add(cameraTracker);
+
+				scene.add(cameraTracker);
+				//cameraTracker.add(VRcam);
+
+			    // LOADER
+
+				//circleGeometry = new THREE.CircleGeometry( 20, segments, 0, 0);
+				// circleMaterial = new THREE.MeshBasicMaterial( { transparent: true, opacity: 0.1 } );
+				// loader = new THREE.Mesh( circleGeometry, circleMaterial );
+     
+				//scene.add(loader);
+
+				//cameraTracker.add(loader);
+
+				//raycaster
+
+				raycaster = new THREE.Raycaster();
+
+				// Particle
+
+				var triangleGeometry = new THREE.Geometry();
+
+				for ( i = 0; i < numOfParticles; i ++ ) {
+
+					var vertex = new THREE.Vector3();
+			
+					 vertex.x = ( radius * Math.cos(angle * i));
+					 vertex.z = ( radius * Math.sin(angle * i));
+			 		 vertex.y = Math.sin(angle * i)/3 * 20;
+
+					triangleGeometry.vertices.push( vertex );
+					
+					deltaArray.push( i * 5 );
+
+				}
+	          
+
+				parameters = [
+					[ [1, 1, 0.5], 3 ],
+					[ [0.95, 1, 0.5], 2 ],
+					[ [0.90, 1, 0.5], 1.3 ],
+					[ [0.85, 1, 0.5], 0.8 ],
+					[ [0.80, 1, 0.5], 0.5 ]
+				];
+    
+
+				for ( i = 0; i < parameters.length; i ++ ) {
+
+					color = parameters[i][0];
+					size  = parameters[i][1];
+
+					// materials[i] = new THREE.PointsMaterial( { size: size } );
+
+					materials[i] = new THREE.PointsMaterial( { size: size, map: sprite, blending: THREE.AdditiveBlending, depthTest: false, transparent : true } );
+					
+					materials[i].color.setHSL( color[0], color[1], color[2] );
+
+					particles = new THREE.Points( triangleGeometry, materials[i] );
+
+				    scene.add( particles );
+
+				}
+
+				// Envoirment 
+				
+				var r = "textures/cube/skybox/";
+				var urls = [ r + "px.jpg", r + "nx.jpg",
+							 r + "py.jpg", r + "ny.jpg",
+							 r + "pz.jpg", r + "nz.jpg" ];
+
+		        cubeTexture = new THREE.CubeTextureLoader().load( urls );
+		        var cubeShader = THREE.ShaderLib[ "cube" ];
+		        cubeShader.uniforms[ "tCube" ].value = cubeTexture;
+
+		        cubeMaterial = new THREE.ShaderMaterial( {
+
+		            fragmentShader:  cubeShader.fragmentShader,
+		            vertexShader:  cubeShader.vertexShader,
+		            uniforms:  cubeShader.uniforms,
+		            side: THREE.BackSide
+
+		        });
+
+				var textureLoader = new THREE.TextureLoader();
+
+				textureEquirec = textureLoader.load( "textures/nike/1.jpg" );
+				textureEquirec2 = textureLoader.load( "textures/nike/2.jpg" );
+				textureEquirec3 = textureLoader.load( "textures/nike/3.jpg" );
+				textureEquirec.magFilter = THREE.LinearFilter;
+				textureEquirec.minFilter = THREE.LinearMipMapLinearFilter;
+
+				equirectShader = THREE.ShaderLib[ "equirect" ];
+
+				equirectMaterial = new THREE.ShaderMaterial( {
+					fragmentShader: equirectShader.fragmentShader,
+					vertexShader: equirectShader.vertexShader,
+					uniforms: equirectShader.uniforms,
+					depthWrite: false,
+					side: THREE.BackSide
+				} );
+
+				equirectMaterial.uniforms[ "tEquirect" ].value = textureEquirec;
+
+		        cubeMesh = new THREE.Mesh( new THREE.CubeGeometry( 1000, 1000, 1000 ), cubeMaterial );
+
+		        scene.add( cubeMesh );
+
+				// LIGHT
+
+				var directionalLight = new THREE.DirectionalLight( 0xb8b8b8 );
+				directionalLight.position.set( 1, 1, 1 ).normalize();
+				directionalLight.intensity = 1.0;
+				scene.add( directionalLight );
+	
+
+				// RENDERER
+
+				renderer = new THREE.WebGLRenderer( {antialias: true} );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.autoClear = false;
+				element = renderer.domElement;
+				container.appendChild(element);
+
+				effect = new THREE.StereoEffect( renderer );
+				effect.setSize( window.innerWidth, window.innerHeight );
+
+/*
+				// Gui
+				var params = {
+					Normal: function () {
+					stereoMode = false;	
+					},
+
+					Stereo: function () {
+					stereoMode = true;	
+					}
+	
+				};
+
+				var gui = new dat.GUI();
+				gui.add( params, 'Normal');
+				gui.add( params, 'Stereo');
+				gui.open();
+				*/
+
+				console.log("OrbitControls");
+				controls = new THREE.OrbitControls( camera, element);
+				//controls.rotateUp(Math.PI / 4);
+				   controls.target.set(
+				    camera.position.x,
+				    camera.position.y,
+				    camera.position.z  
+				    );
+		        controls.enableZoom = true;
+			    controls.enablePan = true;
+
+			    function setOrientationControls(e) {
+			    	
+			      // If device orientation is not available, return.
+				      // if (!e.alpha) {
+				      //   return;
+				      // }
+
+				      // isVR = true;
+
+				      // Create controls for mobile.
+				      console.log("setOrientationControl");
+				      controls = new THREE.DeviceOrientationControls(camera, true);
+				      controls.connect();
+				      controls.update();
+
+				      element.addEventListener('click', fullscreen, false);
+	
+ 			      window.removeEventListener('deviceorientation', setOrientationControls, false);
+			    }
+			 
+			    window.addEventListener('deviceorientation', setOrientationControls, true);
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false);
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			 function fullscreen() {
+			      if (container.requestFullscreen) {
+			        container.requestFullscreen();
+			      } else if (container.msRequestFullscreen) {
+			        container.msRequestFullscreen();
+			      } else if (container.mozRequestFullScreen) {
+			        container.mozRequestFullScreen();
+			      } else if (container.webkitRequestFullscreen) {
+			        container.webkitRequestFullscreen();
+			      }
+			    }
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+
+			function onDocumentMouseMove( event ) {
+
+				// if(isVR) {
+				// 	return;
+				// }
+
+				event.preventDefault();
+
+				//move screen around / only in screen mode
+				mouseX = ( event.clientX - windowHalfX ) / 2;
+				mouseY = ( event.clientY - windowHalfY ) / 2;
+
+				//Replacing mouse position with rayDirection.
+
+				 rayDirection.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+				 rayDirection.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+			}
+
+			function raycaster_update(){
+
+				// console.log('rayDirection');
+				// console.log(rayDirection);
+
+				//getting rayDirection from the center
+				// var vector = camera.position.clone().unproject( camera );
+				// var rayDirection = new THREE.Vector3( 0, 0, -1 ).transformDirection( camera.matrixWorld );
+				raycaster.setFromCamera(rayDirection, camera);
+				// raycaster.set( vector, direction );
+
+				intersects = raycaster.intersectObjects( interactableObjects, true);
+	
+				if ( intersects.length > 0 && hoveringObject != intersects[0].object.parent.parent) 
+
+					{
+						hoveringObject =  intersects[0].object.parent.parent;
+						document.body.style.cursor = 'none';
+
+						console.log("hovering on: " + hoveringObject.name);
+						d = 0;
+			    		switch(hoveringObject.name){
+			    			case('sneaker1'):
+			    			particleMode = 1;
+			    			sceneMode = 2;
+			    			break;
+
+			    			case('sneaker2'):
+							particleMode = 2;
+							sceneMode = 3;
+			    			break;
+
+			    			case('sneaker3'):
+							particleMode = 3;
+							sceneMode = 4;
+			    			break;
+			    		}
+	
+				} else if(intersects.length == 0 && hoveringObject != null) {
+					console.log("hovering off from: " + hoveringObject.name);
+					hoveringObject = null;
+					document.body.style.cursor = 'auto';
+
+				}
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				render();
+				update_points();
+				update_loader();
+				controls.update();
+		        raycaster_update();
+			}
+
+			function render() {
+				
+				//move camera around with mouse (screen mode only
+				
+
+				
+				camera.rotation.y += -(mouseX - camera.rotation.y) * 0.05; // horizental rotate
+
+				// verticle rotate, x on web z on mobil
+
+				cameraTracker.rotation.set(camera.rotation.x, camera.rotation.y, camera.rotation.z);
+
+				
+				//shoe rotation
+		        for(i=0; i<scene.children.length; i++){
+		        	var object = scene.children[ i ];
+
+		        	if (object.type == "Scene") {
+		        		object.rotation.y +=0.03;
+		        	} 
+		        }
+	        	
+				
+				// if(isVR) {
+					effect.render(scene, camera);
+				// } else {
+				// 	renderer.render(scene, camera);
+				// }		
+			}
+
+
+			function update_points(){
+
+				var counter = Date.now() * 0.001;
+
+				var new_poistions=[];
+				var x, y, z;
+
+				objX = (hoveringObject != null) ? hoveringObject.position.x : objX,
+		 		objZ = (hoveringObject != null) ? hoveringObject.position.z : objZ;
+
+		 		
+
+			 	if(hoveringObject != null) {
+			 		d += (maxRadius - d) * 0.2;
+				
+			 	} else {
+			 		d += (0 - d) * 0.2;
+			 	
+			 	}
+
+				for ( i = 0; i < numOfParticles; i ++ ) {
+					
+
+			 		 switch (particleMode) {
+
+				 		 case 1:
+					 		 x =  objX + d * Math.cos(angle * i);
+							 z =  objZ + d * Math.sin(angle * i);
+					 		 y =  Math.cos(angle * i * 4 + counter) * deltaArray[i] * 0.01;
+					 		
+					 
+						 break;
+
+				 		 case 2:
+
+							 x =  objX + d * Math.sin((angle)* i);
+							 z =  objZ + d * Math.cos((angle) * i);
+					 		 y =  Math.cos(angle * i * 8 + counter)*10 ;
+						 
+					
+					 	 break;
+
+	 			 		 case 3:
+
+							 x = objX + d * Math.cos(angle * i);
+							 z = objZ + d * Math.sin(angle * i);
+							 y = 60 * Math.sin(angle * i + counter)/3  ;
+					
+					 	 break;
+
+				 		 default:
+					 		
+				 		}
+				  
+				    new_poistions.push(new THREE.Vector3(x, y, z));
+				}
+
+				for ( i = 0; i < materials.length; i ++ ) {
+
+					color = parameters[i][0];
+
+					h = ( 360 * ( color[0] + time ) % 360 ) / 360;
+					materials[i].color.setHSL( h, color[1], color[2] );
+
+				
+				}
+
+				particles.geometry.vertices =new_poistions;
+				particles.geometry.verticesNeedUpdate = true;
+				particles.material.needsUpdate = true;
+			
+			}	
+
+		</script>
+
+	</body>
+</html>

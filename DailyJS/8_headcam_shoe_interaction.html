@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>three.js webgl - animation - skinning</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            color: #000;
+            font-family: Monospace;
+            font-size: 13px;
+            text-align: center;
+            background-color: #fff;
+            margin: 0px;
+            overflow: hidden; 
+        }
+        
+        #info {
+            position: absolute;
+            top: 0px;
+            width: 100%;
+            padding: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container"></div>
+    <div id="info">
+        webgl animation test
+    </div>
+
+    <script src="build/three.min.js"></script>
+
+    <script src="js/Detector.js"></script>
+    <script src="js/libs/stats.min.js"></script>
+    <script src="js/controls/OrbitControls.js"></script>
+    <script src="js/BlendCharacter.js"></script>
+    <script src="js/BC2.js"></script>
+    <script src="js/libs/dat.gui.min.js"></script>
+    <script src="js/DeviceOrientationControls.js"></script>
+    <script src="js/StereoEffect.js"></script>
+
+    <script>
+        if (!Detector.webgl) Detector.addGetWebGLMessage();
+
+        var container, stats;
+
+        var blendMesh, helper, camera, camera2, scene, renderer, controls, controls2, element;
+
+        var clock = new THREE.Clock();
+        var gui = null;
+
+        var isFrameStepping = false,
+            isStopping = false;
+
+        var timeToStep = 0;
+
+        var FLOOR = 0;
+
+
+        var windowHalfX = window.innerWidth / 2,
+            windowHalfY = window.innerHeight / 2;
+        
+        // RayCaster 
+
+        var raycaster,intersects, hoveringObject;
+        var interactableObjects = [],
+            interactableObjects_init = [];
+        
+        var rayDirection = new THREE.Vector2();
+
+        var mouse = { x: 0, y: 0, z: 1 };
+
+        var interactiveRange = new THREE.Object3D(),
+            shoeRange = new THREE.Object3D(),
+            head = new THREE.Object3D();
+        
+
+        var camBox, headBox;
+
+        var headZ = -10,
+            headX = 0,
+            headY = 180;
+
+        var camZ = -15,
+            camX = 0,
+            camY = 10;
+
+        var wave, middleMesh;
+
+        var waveRadius = 100, 
+            obj_resolution = 360,
+            waves_amount = 2,
+            wave_height = 0.05 * waveRadius;
+
+
+        var numOfObjects = 2;
+
+        var src1, src2, src3, src4;
+
+        var light, lightOffset;
+
+        var color1 = new THREE.Color(0xCC0033), //red
+            color2 = new THREE.Color(0x0033CC), //blue
+            color3 = new THREE.Color(0xFFCC00); //yellow
+
+        var colors = [color1, color2, color3];
+
+        var deviceOrientation = {};
+        var screenOrientation = 0;
+
+
+        var aspect = window.innerWidth / window.innerHeight;
+
+
+        var isVR = false;
+
+        var interactRangeRadius = 160;
+
+        // loader
+        var loader;
+        var segments = 64,
+            circleStart = 0,
+            circleEnds =  Math.PI*2,
+            circleRadius = 10,
+            loader_y =-5,
+            loader_speed = 0.08;
+
+        var stereoMode = false;
+        var effect;
+
+        var loader;
+        var loaders = [],
+            shoes = [];
+
+        var changetosrc, waveColor;
+        
+        var cursor;
+ 
+
+        // LOAD TEXTURE SRC
+        src2 = "models/animated/1_red.png";
+        src3 = "models/animated/2_blue.png";
+        src4 = "models/animated/3_yellow.png";
+        src1 = "models/animated/0_normal.png";
+
+        init();
+
+
+        function createMesh(geom) {
+                var meshMaterial = new THREE.MeshBasicMaterial({color:0x3399FF,transparent: true, opacity:0.5});
+                meshMaterial.side = THREE.DoubleSide;
+                var mesh = new THREE.Mesh(geom, meshMaterial);
+                return mesh;
+            }
+
+
+
+       function loadShoe(src,id,x,y,z,color){
+
+    
+        var objectLoader = new THREE.ObjectLoader();
+
+        objectLoader.load(src, function ( obj ) {
+
+                obj.name = 'shoe'+id;
+                obj.position.set(x,y,z);
+                obj.scale.set(1.5,1.5,1.5);
+
+                shoeRange.add(obj);
+                shoes.push(obj);
+                
+                loader = createMesh(new THREE.CircleGeometry(circleRadius, segments, circleStart, circleEnds));
+                loader.name = 'loader'+id;
+                loader.position.set(x,y,z);
+                loader.rotation.x = Math.PI/2;
+
+                shoeRange.add(loader);
+                loaders.push(loader);
+
+            });
+          
+        }
+
+        function createShoes(){
+
+ 
+             for (var i = 0; i <= numOfObjects; i++) {
+
+                var src1= "models/shoe/shoe_red.json"
+                var src2 ="models/shoe/shoe_blue.json";
+                var src3= "models/shoe/shoe_yellow.json"
+                changetosrc= src1;
+
+                var src = [src3, src1, src2];
+
+                var vertex = new THREE.Vector3();
+
+                vertex.y = FLOOR + 2;
+                vertex.x = waveRadius * Math.cos(30 * i);
+                vertex.z = waveRadius * Math.sin(30 * i);
+  
+                loadShoe(src[i], i, vertex.x, vertex.y, vertex.z);
+
+            }
+        
+            shoeRange.visible = false;
+            interactableObjects.push(shoeRange);
+
+        }
+
+
+        // -----------------------------------------------------------------------
+
+
+        function createSky() {
+
+            var path = "textures/sunnysky/";
+            var format = '.jpg';
+            var urls = [
+                path + 'px' + format, path + 'nx' + format,
+                path + 'py' + format, path + 'ny' + format,
+                path + 'pz' + format, path + 'nz' + format
+            ];
+
+            var textureCube = THREE.ImageUtils.loadTextureCube(urls);
+
+            var shader = THREE.ShaderLib["cube"];
+            shader.uniforms["tCube"].value = textureCube;
+
+            // We're inside the box, so make sure to render the backsides
+            // It will typically be rendered first in the scene and without depth so anything else will be drawn in front
+            var material = new THREE.ShaderMaterial({
+                fragmentShader: shader.fragmentShader,
+                vertexShader: shader.vertexShader,
+                uniforms: shader.uniforms,
+                depthWrite: false,
+                side: THREE.BackSide
+            });
+
+            // The box dimension size doesn't matter that much when the camera is in the center.  Experiment with the values.
+            var skyboxMesh = new THREE.Mesh(new THREE.CubeGeometry(10000, 10000, 10000, 1, 1, 1), material);
+            skyboxMesh.renderOrder = -10;
+
+            scene.add(skyboxMesh);
+        }
+
+        // -----------------------------------------------------------------------
+        function createGround(scale) {
+
+            var canvas = document.createElement( 'canvas' );
+                canvas.width = 128;
+                canvas.height = 128;
+
+            var context = canvas.getContext( '2d' );
+            var gradient = context.createRadialGradient( canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 2 );
+            gradient.addColorStop( 0.1, 'rgba(250,250,250,1)' );
+            gradient.addColorStop( 0.4, 'rgba(51,153,255,0.8)' ); 
+            
+
+            context.fillStyle = gradient;
+            context.fillRect( 0, 0, canvas.width, canvas.height );
+
+            var shadowTexture = new THREE.Texture( canvas );
+            shadowTexture.needsUpdate = true;
+
+            var loader = new THREE.JSONLoader();
+            var canvas = document.createElement('canvas');
+
+            loader.load("objects/ground.js", function(geometry) {
+            
+                var materials = new THREE.MeshPhongMaterial({
+                    color: 0x999999, shading: THREE.FlatShading, shininess: 0, map: shadowTexture
+                });
+
+                var ground = new THREE.Mesh(geometry, materials);
+
+
+                ground.scale.set(scale, scale, scale);
+                ground.receiveShadow = true;
+                ground.castShadow = true;
+                scene.add(ground);
+            });
+        }
+
+
+        // -----------------------------------------------------------------------
+
+        function drawWaveCircle(radius, wave_amount, linewidth) {
+
+            // opens up when looking at center (shoeAnimateIn) 
+            // closes to the middle when look up (shoeAnimateOut)
+            // work like particles
+
+            //multplying the angle on amount of waves
+
+            wave = new THREE.Line(new THREE.Geometry(), new THREE.LineBasicMaterial({
+                color: waveColor,
+                linewidth: linewidth,
+                transparent: true,
+                opacity: 0.5
+            }));
+
+            for (var i = 0; i <= obj_resolution; i++) {
+                var angle = Math.PI / 180 * i;
+
+                var radius_addon = wave_height * Math.sin(angle * wave_amount);
+
+
+                var x = (radius + radius_addon) * Math.cos(angle);
+                var z = (radius + radius_addon) * Math.sin(angle);
+                var y = 10;
+
+                wave.geometry.vertices.push(new THREE.Vector3(x, y, z));
+            }
+
+            wave.name = "wave";
+            interactiveRange.add(wave);
+            wave.material.opacity = 0.5;
+
+        }
+
+        function drawInteractiveRange(){
+
+            interactiveRange.position.set(0, 0, 0);
+            interactiveRange.name = "Interactive Range";
+            scene.add(interactiveRange);
+        
+            // Draw Middle Range for Stopping (Large Range - Shoe Area)
+            
+            var geometry_mid = new THREE.CircleGeometry(interactRangeRadius-130,32);
+            var material_mid = new THREE.MeshBasicMaterial({
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.02
+            });
+
+            middleMesh = new THREE.Mesh(geometry_mid, material_mid);
+            middleMesh.position.set(0, FLOOR + 1, 0);
+            middleMesh.rotation.x = -Math.PI / 2;
+            middleMesh.name = "stopMesh";
+
+            interactiveRange.add(middleMesh);
+            drawWaveCircle(circleRadius, waves_amount, 2);
+
+            interactableObjects_init.push(middleMesh);        
+
+        }
+
+
+        function init() {
+
+            container = document.getElementById('container');
+
+            scene = new THREE.Scene();
+            scene.add(new THREE.AmbientLight(0xaaaaaa));
+
+            lightOffset = new THREE.Vector3(0, 1000, -1000.0);
+
+            light = new THREE.DirectionalLight(0xffffff, 1.5);
+            light.position.copy(lightOffset);
+            light.castShadow = true;
+            light.shadow.mapSize.width = 2048;
+            light.shadow.mapSize.height = 1024;
+            //light.shadow.Darkness = 0.5;
+            light.shadow.camera.near = 10;
+            light.shadow.camera.far = 2000;
+            light.shadow.bias = 0.00001;
+            light.shadow.camera.right = 2000;
+            light.shadow.camera.left = -2000;
+            light.shadow.camera.top = 2000;
+            light.shadow.camera.bottom = -2000;
+            scene.add(light);
+
+            blendMesh = new THREE.BlendCharacter();
+            blendMesh.load("models/animated/marine_anims.js", createScene);
+
+            drawInteractiveRange();
+            shoeRange.name = "shoe range"
+            scene.add(shoeRange);
+                        
+
+            createShoes();
+
+
+            scene.name= "the scene";
+            
+            head.rotation.y = Math.PI;
+            head.position.set(headX, headY, headZ);
+            scene.add(head);
+
+            headBox = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: 1
+            }));
+
+            headBox.position.set(0, 0, 0);
+            head.add(headBox);     
+
+
+            // Cam Position attached to Head Position 
+
+            camBox = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: 1
+            }));
+
+            camBox.position.set(camX, camY, camZ);
+            headBox.add(camBox);
+
+            //camBox.rotation.z = Math.PI/4;
+
+            // Cambox contains Camera2
+           
+            camera2 = new THREE.PerspectiveCamera(45, aspect, 1, 10000);
+            camera2.position.set(0, 0, 0);
+            camBox.add(camera2);
+
+            // CURSOR SETTINGS
+
+            cursor = new THREE.Mesh(new THREE.SphereGeometry( 3, 15, 15 ), new THREE.MeshBasicMaterial({
+                color: 0x9999FF, transparent: true, opacity: 0.7 }));
+            cursor.geometry.verticesNeedUpdate = true;
+            cursor.position.set(0,0,-100);
+            camBox.add(cursor);
+
+
+            renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true
+            });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            //renderer.autoClear = true;
+            renderer.autoClear = false;
+            renderer.gammaInput = true;
+            renderer.gammaOutput = true;
+            renderer.shadowMap.enabled = true;
+
+            effect = new THREE.StereoEffect( renderer );
+            effect.setSize( window.innerWidth, window.innerHeight );
+
+            stats = new Stats();
+            stats.domElement.style.position = 'absolute';
+            stats.domElement.style.top = '0px';
+            element = renderer.domElement;
+            container.appendChild(element);
+           
+            controls = new THREE.OrbitControls(headBox);
+            controls.target.set(0, waveRadius - 50, 0);
+
+            controls.enableZoom = true;
+            controls.enablePan = true;
+
+
+            function setOrientationControls(event) {
+
+                if (!event.alpha) {
+                    return;
+                }
+
+                isVR = true;
+
+                // Create controls for mobile.
+                controls = new THREE.DeviceOrientationControls(headBox, true);
+                controls.connect();
+
+
+                onScreenOrientationChangeEvent(); // run once on load
+            
+                element.addEventListener('click', fullscreen, false);
+
+                window.addEventListener('orientationchange', onScreenOrientationChangeEvent, false);
+                window.addEventListener('deviceorientation', onDeviceOrientationChangeEvent, false);
+            }
+
+
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousemove', onDocumentMouseMove, false);
+            window.addEventListener('deviceorientation', setOrientationControls, true);
+
+
+            // listen for messages from the gui
+            window.addEventListener('start-animation', onStartAnimation);
+            window.addEventListener('stop-animation', onStopAnimation);
+            window.addEventListener('pause-animation', onPauseAnimation);
+            window.addEventListener('step-animation', onStepAnimation);
+            window.addEventListener('weight-animation', onWeightAnimation);
+            window.addEventListener('crossfade', onCrossfade);
+            window.addEventListener('warp', onWarp);
+            window.addEventListener('toggle-show-skeleton', onShowSkeleton);
+            window.addEventListener('toggle-show-model', onShowModel);
+
+            raycaster = new THREE.Raycaster();
+
+        }
+
+
+        function onDocumentMouseMove(event) {
+            if (isVR) {
+                return;
+            }
+
+            event.preventDefault();
+
+            mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+            mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+            rayDirection.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            rayDirection.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+
+        }
+
+        function update_loader(){
+
+           for( var i =0; i < shoes.length; i++){
+        
+
+                if(hoveringObject != null && hoveringObject == shoes[i]) {
+
+                    loaders[i].scale.x += 0.2; 
+                    loaders[i].scale.y += 0.2; 
+
+                    loaders[i].scale.x = loaders[i].scale.x > 3 ? 3 : loaders[i].scale.x;
+                    loaders[i].scale.y = loaders[i].scale.y > 3 ? 3 : loaders[i].scale.y;
+
+                    shoes[i].scale.set (2,2,2);
+
+                } else {
+                    loaders[i].scale.x = 0.5; 
+                    loaders[i].scale.y = 0.5;
+                    shoes[i].scale.set (1,1,1); 
+
+
+                }
+            }
+        }
+
+
+            function update_cursor(){
+
+                if(hoveringObject != null) {
+                     
+                     this.thetaLength += Math.PI * loader_speed;
+                     if(this.thetaLength >= Math.PI * 2)
+                     {
+                        this.thetaLength = Math.PI * 2;
+                        loading_finish = true;
+                        changeScene();
+                     }
+
+                } else {
+
+                     this.thetaLength = 0;
+                     //this.opacity = 0;
+                     //loader.MeshBasicMaterial.opacity = 0;
+                }
+                
+
+                this.redraw = function () {
+
+                    camBox.remove(cursor);
+                    cursor = createMesh(new THREE.CircleGeometry(circleRadius, segments, circleStart, this.thetaLength));
+    
+
+                    cursor.position.set(0,0,-100);
+
+
+ 
+                    camBox.add(cursor);
+
+
+                };
+
+                this.redraw();
+
+            }
+
+
+        function raycasterShoe_update() {
+
+
+            raycaster.setFromCamera(rayDirection, camera2);
+
+            //Interactable object can only be Shoe Range that contains Shoes only!
+
+            intersects = raycaster.intersectObjects(interactableObjects, true);
+
+
+            if (intersects.length > 0 && hoveringObject != intersects[0].object.parent)
+
+            {
+
+                hoveringObject = intersects[0].object.parent;
+                console.log("hovering on: " + hoveringObject.name);
+                console.log(hoveringObject);
+
+                switch (hoveringObject.name) {
+                    case "shoe0":
+                        changetosrc= src1;
+                        waveColor = colors[2];
+                        break;
+
+                    case "shoe1":
+                        changetosrc = src2;
+                        waveColor = colors[0];
+                        break;
+
+                    case "shoe2":
+                        changetosrc = src3;
+                        waveColor = colors[1];
+                        break;
+       
+                    default:
+                        changetosrc = src1;
+                    }
+
+                shoeAnimateOut();
+                setTimeout(function() {
+                blendMesh.crossfade( 'idle','walk' , 2);
+                  }, 200);    
+
+                } else if (intersects.length == 0 && hoveringObject != null) {
+                hoveringObject = null;
+
+
+            }
+        }
+
+        function raycasterInit_update() {
+
+
+            raycaster.setFromCamera(rayDirection, camera2);
+            intersects = raycaster.intersectObjects(interactableObjects_init, true);
+
+
+            if (intersects.length > 0 && hoveringObject != intersects[0].object)
+
+
+            { 
+                hoveringObject =  intersects[0].object;
+                
+                if(hoveringObject.name == "stopMesh") {
+                   blendMesh.crossfade( 'walk','idle' , 2);
+                   shoeAnimateIn();   
+
+                } 
+            } else if (intersects.length == 0 && hoveringObject != null) {
+
+                console.log("hovering off from: " + hoveringObject.name);
+                hoveringObject = null;
+            }
+
+        }
+
+
+        function shoeAnimateIn(){  
+            console.log("shoes animate in");   
+             setTimeout(function() {
+                shoeRange.visible = true;
+                isStopping = true;
+            }, 500);    
+        }
+
+        function shoeAnimateOut(){
+            console.log("shoes animate out");    
+            setTimeout(function() {
+                shoeRange.visible = false;
+                isStopping = false;
+                blendMesh.material.map.image.src = changetosrc;
+            }, 300);  
+        }
+
+
+       function onShoeAnimate() {
+        for(i=0; i<shoeRange.children.length; i++){
+
+            var object = shoeRange.children[ i ];
+
+              if (object.type == "Scene") {
+                        var shoe = shoeRange.children[ i ];
+                        shoe.rotation.y += Math.PI / 600;
+                    } 
+                }
+
+             if (!isStopping) {
+              raycasterInit_update();
+
+             } else {
+              raycasterShoe_update();
+            
+            }     
+                
+        }
+
+
+        function update_wave(){
+            var counter = Date.now() * 0.005;
+            var new_poistions=[];
+            var x, y, z;
+
+            d = isStopping ? 130 : 50;
+
+          for (var i = 0; i <= obj_resolution; i++) {
+                var angle = Math.PI / 180 * i;
+                var radius_addon = 1.2 * Math.sin(angle * 20);
+
+
+                x =  (d + radius_addon + Math.cos(counter)) * Math.cos(angle);
+                z =  (d + radius_addon + Math.sin(counter)) * Math.sin(angle);
+                y =  FLOOR+5;
+
+                new_poistions.push(new THREE.Vector3(x, y, z));
+
+            }
+
+            wave.geometry.vertices = new_poistions;
+            wave.geometry.verticesNeedUpdate = true;
+            wave.material.needsUpdate = true;
+            wave.material.color.set(waveColor);
+            wave.rotation.y = Math.cos(counter*0.1);
+
+        }
+
+
+        function onWindowResize() {
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            camera2.aspect = window.innerWidth / window.innerHeight;
+            camera2.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+        }
+
+        function onStartAnimation(event) {
+
+            isFrameStepping = false;
+            isStopping = false;
+
+
+        }
+
+        function onStopAnimation(event) {
+            isStopping = true;
+        }
+
+        function onPauseAnimation(event) {
+
+            (isFrameStepping) ? blendMesh.unPauseAll(): blendMesh.pauseAll();
+
+            isFrameStepping = false;
+
+        }
+
+        function onStepAnimation(event) {
+
+            blendMesh.unPauseAll();
+            isFrameStepping = true;
+            timeToStep = event.detail.stepSize;
+        }
+
+        function onWeightAnimation(event) {
+
+            var data = event.detail;
+            for (var i = 0; i < data.anims.length; ++i) {
+
+                blendMesh.applyWeight(data.anims[i], data.weights[i]);
+
+            }
+
+        }
+
+        function onCrossfade(event) {
+
+            var data = event.detail;
+
+            blendMesh.stopAll();
+            blendMesh.crossfade(data.from, data.to, data.time);
+
+            isFrameStepping = false;
+
+        }
+
+        function onWarp(event) {
+
+            var data = event.detail;
+
+            blendMesh.stopAll();
+            blendMesh.warp(data.from, data.to, data.time);
+
+            isFrameStepping = false;
+
+        }
+
+        function onShowSkeleton(event) {
+
+            var shouldShow = event.detail.shouldShow;
+            helper.visible = shouldShow;
+
+        }
+
+        function onShowModel(event) {
+
+            var shouldShow = event.detail.shouldShow;
+            blendMesh.showModel(shouldShow);
+
+        }
+
+
+
+        function createScene() {
+
+            // blendMesh.rotation.y = Math.PI * -135 / 180;
+            blendMesh.position.set(0,2,0);
+
+            blendMesh.castShadow = true;
+            blendMesh.receiveShadow = true;
+
+            var radius = blendMesh.geometry.boundingSphere.radius;
+
+            camera = new THREE.PerspectiveCamera(45, aspect, 1, 10000);
+            camera.position.set(0.0, radius, radius * 3.5);
+
+            light.target = blendMesh;
+
+            // Set default weights
+
+            blendMesh.applyWeight('idle', 1 / 3);
+            blendMesh.applyWeight('walk', 1 / 3);
+            blendMesh.applyWeight('run', 1 / 3);
+
+            gui = new BlendCharacterGui(blendMesh);
+
+
+            // Create the debug visualization
+
+            scene.add(blendMesh);
+
+            createGround(20);
+            createSky();
+
+            animate();
+        }
+
+        function animate() {
+
+            requestAnimationFrame(animate, renderer.element);
+            stats.begin();
+            update_loader();
+
+            // step forward in time based on whether we're stepping and scale
+
+            var scale = gui.getTimeScale();
+            var delta = clock.getDelta();
+            var stepSize = (!isFrameStepping) ? delta * scale : timeToStep;
+
+            // modify blend weights
+
+            blendMesh.update(stepSize);
+            gui.update(blendMesh.mixer.time);
+            light.position = blendMesh.position.clone().add(lightOffset);
+
+            stats.end();
+      
+            timeToStep = 0;
+
+            render();
+
+            onShoeAnimate();
+            update_wave();
+           
+        }
+
+        function render() {
+
+
+            // if (isVR) {
+
+                //
+            controls.update();
+            updateOrientation();
+                // effect.render(scene, camera2);
+            // }
+
+            // effect.render(scene, camera2);
+          renderer.render(scene, camera2);
+
+        }
+
+
+        function fullscreen() {
+            if (container.requestFullscreen) {
+                container.requestFullscreen();
+            } else if (container.msRequestFullscreen) {
+                container.msRequestFullscreen();
+            } else if (container.mozRequestFullScreen) {
+                container.mozRequestFullScreen();
+            } else if (container.webkitRequestFullscreen) {
+                container.webkitRequestFullscreen();
+            }
+        }
+
+        /**
+         * takes quarternion data from socket and apply to this camera
+         * to create mirroring effect
+         */
+        function setCameraQuaternion(alpha, beta, gamma, orient) {
+
+            var zee = new THREE.Vector3(0, 0, 1);
+
+            var euler = new THREE.Euler();
+
+            var q0 = new THREE.Quaternion();
+
+            var q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // - PI/2 around the x-axis
+
+            euler.set(beta, alpha, -gamma, 'YXZ'); // 'ZXY' for the device, but 'YXZ' for us
+
+            headBox.quaternion.setFromEuler(euler); // orient the device
+
+            headBox.quaternion.multiply(q1); // camera looks out the back of the device, not the top
+
+            headBox.quaternion.multiply(q0.setFromAxisAngle(zee, -orient)); // adjust for screen orientation
+
+
+        }
+
+        function onDeviceOrientationChangeEvent(e) {
+            deviceOrientation = e;
+
+        }
+
+        function onScreenOrientationChangeEvent() {
+            screenOrientation = window.orientation || 0;
+        }
+
+        function updateOrientation() {
+
+            var alpha = deviceOrientation.alpha ? THREE.Math.degToRad(deviceOrientation.alpha) : 0; // Z
+            var beta = deviceOrientation.beta ? THREE.Math.degToRad(deviceOrientation.beta) : 0; // X'
+            var gamma = deviceOrientation.gamma ? THREE.Math.degToRad(deviceOrientation.gamma) : 0; // Y''
+            var orient = screenOrientation ? THREE.Math.degToRad(screenOrientation) : 0; // O
+
+            setCameraQuaternion(alpha, beta, gamma, orient);
+
+        }
+
+    </script>
+
+</body>
+
+</html>

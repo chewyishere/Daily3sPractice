@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>threesixty</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <link rel="stylesheet" type="text/css" href="styles/threesixty.css" />
+        <link rel="stylesheet" type="text/css" href="styles/loader.css" />
+     <!--    <link href="http://vjs.zencdn.net/5.10.2/video-js.css" rel="stylesheet">  -->
+
+    
+    </head>
+    <body>
+        <button id="open" class="btn--open">open</button>
+
+         <div id="main">     
+          <div id= "loader" class="bubblingG">
+            <span id="bubblingG_1">
+            </span>
+            <span id="bubblingG_2">
+            </span>
+            <span id="bubblingG_3">
+            </span>
+        </div>
+        
+            <div id="container">
+                <button id ="close" class="btn--close">close</button>
+                <video id="video" preload="auto" controls autoplay loop>
+                    <source src="video/01.mp4" type="video/mp4"></source>
+                    Your browser does not support the video element
+                </video>
+            </div>
+
+            <div class="modal-container">
+               
+                <div id = "modal-img" class="modal">
+                     <span> image div </span> 
+                </div>
+                <div id = "modal-video" class="modal">
+                    <span> video div </span> </div>
+                <div id = "modal-text" class="modal">
+                    <span> text div </span> 
+                </div>
+            </div>
+        </div>
+
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+        <script>
+        
+        $(document).ready(function(){
+            var main = $("#main"),
+                btn_close = $(".btn--close"),
+                btn_open = $(".btn--open"),
+                loader = $("#loader");
+
+            btn_open.click(function(){
+                btn_close.css('visibility', 'visible');
+                btn_open.hide(300);
+                
+                main.animate({top: 0, left: 0, height: '100%',width: '100%', opacity: '1'}, "slow");
+            });
+
+            btn_close.click(function(){
+                main.animate({top: '50%', left: '50%', height: '0px', width: '0px', opacity: '0'}, "slow");
+                btn_close.css('visibility', 'hidden');
+                btn_open.show(300);
+
+            });
+
+        });
+    </script>
+
+        <script src="js/build/three.min.js"></script>
+        <script src="js/DeviceOrientationControls.js"></script>
+        <script src="js/OrbitControls.js"></script>
+        <script src="js/CSS3DRenderer.js"></script>
+        <script src="js/stats.min.js"></script>
+        <script src="js/VideoControl_Ray.js"></script>
+    
+    </body>
+</html>

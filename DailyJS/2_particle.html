@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Nike_test3_Points</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+		</style>
+	</head>
+
+	<body>
+		<div id="info">
+		webGL shoe tests</div>
+
+		<script src="../build/three.min.js"></script>
+		<script src='js/controls/OrbitControls.js'></script>
+		<script src="js/Detector.js"></script>
+		<script src="js/libs/stats.min.js"></script>
+		<script src="js/utils/lodash.core.min.js"></script>
+
+		<script>
+
+
+
+
+		    var SCREEN_WIDTH = window.innerWidth;
+			var SCREEN_HEIGHT = window.innerHeight;
+
+			var container, stats;
+
+			var camera, scene, renderer, particles, geometry, materials = [], parameters, i, h, color, sprite, size;
+
+			var mouseX = 0, mouseY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var radius = 100;
+			var numOfParticles =600;
+			var angle = 360/numOfParticles;
+			var bendW = 100; //width of the Y particles 
+
+			var deltaArray = [];
+
+			init();
+			animate();
+
+			function getRandomInt(min, max) {
+			    return Math.floor(Math.random() * (max - min + 1)) + min;
+			}
+			function mapRange(value, low1, high1, low2, high2) {
+			    return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
+			}
+
+		    function loadModels(){
+				var objectLoader = new THREE.ObjectLoader();
+				objectLoader.load("models/json/nike/nikeNoFloor.json", function ( obj ) {
+				scene.add( obj );
+				} );
+			}
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				// CAMERA
+				camera = new THREE.PerspectiveCamera( 45, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 10000 );
+
+				camera.position.z = 100;
+				
+				// SCENE
+
+				scene = new THREE.Scene();
+				scene.fog = new THREE.FogExp2( 0x000000, 0.0008 );
+
+				
+				// TRIANGLE PARTICLE 
+
+				// Step1 - Create Instance of Geometry 
+
+				var triangleGeometry = new THREE.Geometry();
+
+				// Step2 - Define shape vertices
+
+				triangleGeometry.vertices.push(new THREE.Vector3( 0.0,  1.0, 0.0)); 
+                triangleGeometry.vertices.push(new THREE.Vector3(-1.0, -1.0, 0.0)); 
+                triangleGeometry.vertices.push(new THREE.Vector3( 1.0, -1.0, 0.0)); 
+
+                // step3 - Define how vertices link together
+
+	            triangleGeometry.faces.push(new THREE.Face3(0, 1, 2)); 
+	            
+	            // step4 - Create Instance of mesh that will be used for particle (useful?)
+
+	            particleMesh = new THREE.Mesh(triangleGeometry, new THREE.MeshNormalMaterial() );
+
+	            //If add this line the whole scene will turn into one triangle.
+			    //scene.add(particleMesh); 
+
+				for ( i = 0; i < numOfParticles; i ++ ) {
+
+					var vertex = new THREE.Vector3();
+			
+					 vertex.x = ( radius * Math.cos(angle * i) + 0 );
+					 vertex.z = ( radius * Math.sin(angle * i) + 0 );
+			 		 vertex.y = Math.sin(angle * i)/3 * bendW;
+
+					//particleMesh.geometry.vertices.push( vertex );
+					triangleGeometry.vertices.push( vertex );
+					
+					deltaArray.push( i * 5 );
+
+				}
+	            // step5 - Set parameters for particle
+
+				parameters = [
+					[ [1, 1, 0.5], 3 ],
+					[ [0.95, 1, 0.5], 2 ],
+					[ [0.90, 1, 0.5], 1 ],
+					[ [0.85, 1, 0.5], 0.5 ],
+					[ [0.80, 1, 0.5], 0.2 ]
+				];
+    
+
+				for ( i = 0; i < parameters.length; i ++ ) {
+
+					color = parameters[i][0];
+					size  = parameters[i][1];
+
+					materials[i] = new THREE.PointsMaterial( { size: size } );
+
+					particles = new THREE.Points( triangleGeometry, materials[i] );
+
+					scene.add( particles );
+
+				}
+
+				console.log(particles);
+
+				
+				/* PARTICLE TEXTURE
+
+				geometry = new THREE.Geometry();
+
+				// PARTICLE TEXTURE LOADER 
+
+			    var textureLoader = new THREE.TextureLoader();
+
+				sprite1 = textureLoader.load( "textures/sprites/snowflake1.png" );
+				sprite2 = textureLoader.load( "textures/sprites/snowflake2.png" );
+				sprite3 = textureLoader.load( "textures/sprites/snowflake3.png" );
+				sprite4 = textureLoader.load( "textures/sprites/snowflake4.png" );
+				sprite5 = textureLoader.load( "textures/sprites/snowflake5.png" );
+
+
+				// PARTICLE 
+
+				parameters = [
+					[ [1.0, 0.2, 0.5], sprite2, 20 ],
+					[ [0.95, 0.1, 0.5], sprite3, 10 ],
+					[ [0.90, 0.05, 0.5], sprite1, 8 ],
+					[ [0.85, 0, 0.5], sprite5, 4 ],
+					[ [0.80, 0, 0.5], sprite4, 2 ]
+				];
+
+				for ( i = 0; i < parameters.length; i ++ ) {
+
+					color  = parameters[i][0];
+					sprite = parameters[i][1];
+					size   = parameters[i][2];
+
+					materials[i] = new THREE.PointsMaterial( { size: size, map: sprite, blending: THREE.AdditiveBlending, depthTest: false, transparent : true } );
+					materials[i].color.setHSL( color[0], color[1], color[2] );
+
+					particles = new THREE.Points( geometry, materials[i] );
+					scene.add( particles );
+				
+				}
+				*/
+
+				// LIGHT
+
+				var directionalLight = new THREE.DirectionalLight( 0xb8b8b8 );
+				directionalLight.position.set( 1, 1, 1 ).normalize();
+				directionalLight.intensity = 1.0;
+				scene.add( directionalLight );
+
+				// Renderer 
+
+				renderer = new THREE.WebGLRenderer( {antialias: true} );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+
+
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				container.appendChild( stats.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+
+				window.addEventListener( 'resize', onWindowResize, false );
+		
+				loadModels();	
+			}
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function onDocumentMouseMove( event ) {
+
+				mouseX = ( event.clientX - windowHalfX ) / 2;
+				mouseY = ( event.clientY - windowHalfY ) / 2;
+
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				render();
+				update_points();
+				stats.update();
+
+			}
+
+			function render() {
+				var time = Date.now() * 0.00005;
+
+
+				 camera.position.y += (-mouseY - camera.position.y) * 0.05;
+		         camera.position.x += (mouseX - camera.position.x) * 0.05;
+
+				 camera.lookAt( scene.position );
+
+				for ( i = 0; i < scene.children.length; i ++ ) {
+
+
+					var object = scene.children[ i ];
+
+					if ( object instanceof THREE.Points ) {
+
+						object.rotation.y = time * ( i < 4 ? i + 1 : - ( i + 1 ) );
+					
+
+					}
+
+				}
+
+				for ( i = 0; i < materials.length; i ++ ) {
+
+					color = parameters[i][0];
+
+					h = ( 360 * ( color[0] + time ) % 360 ) / 360;
+					materials[i].color.setHSL( h, color[1], color[2] );
+
+				}
+
+				renderer.render( scene, camera );
+			}
+
+
+			function update_points(){
+
+				var counter = Date.now() * 0.001;
+
+				var new_poistions=[];
+
+				for ( i = 0; i < numOfParticles; i ++ ) {
+					 var x =  radius * Math.cos(angle * i  * 0.5 );
+					 var z =  radius * Math.sin(angle * i  * 0.5 );
+			 		 var y = Math.cos(angle * i * 5 + counter) * deltaArray[i] * 0.005;
+
+				    new_poistions.push(new THREE.Vector3(x, y, z));
+
+					}
+				particles.geometry.verticesNeedUpdate = true;
+				particles.geometry.vertices =new_poistions;
+		
+			 }	
+
+		</script>
+
+	</body>
+</html>
